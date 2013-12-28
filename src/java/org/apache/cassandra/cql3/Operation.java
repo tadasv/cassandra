@@ -174,6 +174,8 @@ public abstract class Operation
                     return new Sets.Setter(receiver.name, v);
                 case MAP:
                     return new Maps.Setter(receiver.name, v);
+                case HYPERLOGLOG:
+                    return new HyperLogLogs.Setter(receiver.name, v);
             }
             throw new AssertionError();
         }
@@ -262,6 +264,8 @@ public abstract class Operation
                     return new Lists.Appender(receiver.name, v);
                 case SET:
                     return new Sets.Adder(receiver.name, v);
+                case HYPERLOGLOG:
+                    return new HyperLogLogs.Adder(receiver.name, v);
                 case MAP:
                     return new Maps.Putter(receiver.name, v);
             }
@@ -305,6 +309,8 @@ public abstract class Operation
                     return new Lists.Discarder(receiver.name, v);
                 case SET:
                     return new Sets.Discarder(receiver.name, v);
+                case HYPERLOGLOG:
+                    throw new InvalidRequestException(String.format("Invalid operation (%s) for hyperloglog column %s", toString(receiver), receiver));
                 case MAP:
                     throw new InvalidRequestException(String.format("Invalid operation (%s) for map column %s", toString(receiver), receiver));
             }
@@ -402,6 +408,8 @@ public abstract class Operation
                 case SET:
                     Term elt = element.prepare(Sets.valueSpecOf(receiver));
                     return new Sets.Discarder(id, elt);
+                case HYPERLOGLOG:
+                    throw new InvalidRequestException(String.format("Invalid deletion operation for hyperloglog collection column %s", receiver));
                 case MAP:
                     Term key = element.prepare(Maps.keySpecOf(receiver));
                     return new Maps.DiscarderByKey(id, key);

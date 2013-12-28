@@ -36,7 +36,7 @@ public abstract class CollectionType<T> extends AbstractType<T>
 {
     public enum Kind
     {
-        MAP, SET, LIST
+        MAP, SET, LIST, HYPERLOGLOG
     }
 
     public final Kind kind;

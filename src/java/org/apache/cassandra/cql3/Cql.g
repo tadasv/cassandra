@@ -825,6 +825,12 @@ set_or_map[Term.Raw t] returns [Term.Raw value]
       { $value = new Sets.Literal(s); }
     ;
 
+ hyperloglog_literal[Term.Raw t] returns [Term.Raw value]
+     : { List<Term.Raw> s = new ArrayList<Term.Raw>(); s.add(t); }
+           ( ',' tn=term { s.add(tn); } )*
+       { $value = new HyperLogLogs.Literal(s); }
+     ;
+
 collection_literal returns [Term.Raw value]
     : '[' { List<Term.Raw> l = new ArrayList<Term.Raw>(); }
           ( t1=term { l.add(t1); } ( ',' tn=term { l.add(tn); } )* )?
@@ -833,6 +839,8 @@ collection_literal returns [Term.Raw value]
     // Note that we have an ambiguity between maps and set for "{}". So we force it to a set literal,
     // and deal with it later based on the type of the column (SetLiteral.java).
     | '{' '}' { $value = new Sets.Literal(Collections.<Term.Raw>emptyList()); }
+    | '[[' ']]' { $value = new HyperLogLogs.Literal(Collections.<Term.Raw>emptyList()); }
+    | '[[' t=term v=hyperloglog_literal[t] { $value = v; } ']]'
     ;
 
 usertype_literal returns [UserTypes.Literal ut]
@@ -986,6 +994,9 @@ native_type returns [CQL3Type t]
     ;
 
 collection_type returns [CQL3Type pt]
+    @init {
+        Term.Raw precision = null;
+    }
     : K_MAP  '<' t1=comparatorType ',' t2=comparatorType '>'
         { try {
             // if we can't parse either t1 or t2, antlr will "recover" and we may have t1 or t2 null.
@@ -996,6 +1007,8 @@ collection_type returns [CQL3Type pt]
         { try { if (t != null) $pt = CQL3Type.Collection.list(t); } catch (InvalidRequestException e) { addRecognitionError(e.getMessage()); } }
     | K_SET  '<' t=comparatorType '>'
         { try { if (t != null) $pt = CQL3Type.Collection.set(t); } catch (InvalidRequestException e) { addRecognitionError(e.getMessage()); } }
+    | K_HYPERLOGLOG '<' t1=comparatorType ',' t3=intValue { precision=t3; } '>'
+        { try { if (t1 != null && t3 != null) $pt = CQL3Type.Collection.hyperloglog(t1, precision); } catch (InvalidRequestException e) { addRecognitionError(e.getMessage()); } }
     ;
 
 username
@@ -1145,6 +1158,7 @@ K_MAP:         M A P;
 K_LIST:        L I S T;
 K_NAN:         N A N;
 K_INFINITY:    I N F I N I T Y;
+K_HYPERLOGLOG: H Y P E R L O G L O G;
 
 K_TRIGGER:     T R I G G E R;
 

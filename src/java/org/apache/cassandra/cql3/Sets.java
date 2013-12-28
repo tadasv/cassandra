@@ -31,6 +31,7 @@ import com.google.common.base.Joiner;
 
 import org.apache.cassandra.db.ColumnFamily;
 import org.apache.cassandra.db.marshal.CollectionType;
+import org.apache.cassandra.db.marshal.HyperLogLogType;
 import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.db.marshal.SetType;
 import org.apache.cassandra.exceptions.InvalidRequestException;
@@ -47,6 +48,9 @@ public abstract class Sets
 
     public static ColumnSpecification valueSpecOf(ColumnSpecification column)
     {
+        if (column.type instanceof HyperLogLogType) {
+            return new ColumnSpecification(column.ksName, column.cfName, new ColumnIdentifier("value(" + column.name + ")", true), ((HyperLogLogType)column.type).elements);
+        }
         return new ColumnSpecification(column.ksName, column.cfName, new ColumnIdentifier("value(" + column.name + ")", true), ((SetType)column.type).elements);
     }
 
@@ -84,14 +88,28 @@ public abstract class Sets
 
                 values.add(t);
             }
-            DelayedValue value = new DelayedValue(((SetType)receiver.type).elements, values);
+
+            DelayedValue value;
+            if (receiver.type instanceof SetType) {
+                value = new DelayedValue(((SetType)receiver.type).elements, values);
+            } else {
+                value = new DelayedValue(((HyperLogLogType)receiver.type).elements, values);
+            }
+
             return allTerminal ? value.bind(Collections.<ByteBuffer>emptyList()) : value;
         }
 
         private void validateAssignableTo(ColumnSpecification receiver) throws InvalidRequestException
         {
-            if (!(receiver.type instanceof SetType))
-            {
+            if (receiver.type instanceof HyperLogLogType) {
+                ColumnSpecification valueSpec = Sets.valueSpecOf(receiver);
+                for (Term.Raw rt : elements)
+                {
+                    if (!rt.isAssignableTo(valueSpec))
+                        throw new InvalidRequestException(String.format("Invalid set literal for %s: value %s is not of type %s", receiver, rt, valueSpec.type.asCQL3Type()));
+                }
+                return;
+            } else if (!(receiver.type instanceof SetType)) {
                 // We've parsed empty maps as a set literal to break the ambiguity so
                 // handle that case now
                 if (receiver.type instanceof MapType && elements.isEmpty())

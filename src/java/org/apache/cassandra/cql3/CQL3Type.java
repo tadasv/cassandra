@@ -49,7 +49,8 @@ public interface CQL3Type
         UUID     (UUIDType.instance),
         VARCHAR  (UTF8Type.instance),
         VARINT   (IntegerType.instance),
-        TIMEUUID (TimeUUIDType.instance);
+        TIMEUUID (TimeUUIDType.instance),
+        HYPERLOGLOG (HyperLogLog2Type.instance);
 
         private final AbstractType<?> type;
 
@@ -181,6 +182,16 @@ public interface CQL3Type
             return new Collection(SetType.getInstance(t.getType()));
         }
 
+        public static Collection hyperloglog(CQL3Type t, Term.Raw precision) throws InvalidRequestException
+        {
+            if (t.isCollection())
+                throw new InvalidRequestException("set type cannot contain another collection");
+            if (t.isCounter())
+                throw new InvalidRequestException("counters are not allowed inside a collection");
+
+            return new Collection(HyperLogLogType.getInstance(t.getType()));
+        }
+
         public boolean isCollection()
         {
             return true;
@@ -226,6 +237,8 @@ public interface CQL3Type
                     return "list<" + ((ListType)type).elements.asCQL3Type() + ">";
                 case SET:
                     return "set<" + ((SetType)type).elements.asCQL3Type() + ">";
+                case HYPERLOGLOG:
+                    return "hyperloglog<" + ((HyperLogLogType)type).elements.asCQL3Type() + ">";
                 case MAP:
                     MapType mt = (MapType)type;
                     return "map<" + mt.keys.asCQL3Type() + ", " + mt.values.asCQL3Type() + ">";

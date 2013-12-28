@@ -51,7 +51,8 @@ public enum DataType implements OptionCodec.Codecable<DataType>
     INET     (16, InetAddressType.instance),
     LIST     (32, null),
     MAP      (33, null),
-    SET      (34, null);
+    SET      (34, null),
+    HYPERLOGLOG (35, null);
 
     public static final OptionCodec<DataType> codec = new OptionCodec<DataType>(DataType.class);
 
@@ -93,6 +94,8 @@ public enum DataType implements OptionCodec.Codecable<DataType>
                 l.add(DataType.toType(codec.decodeOne(cb)));
                 l.add(DataType.toType(codec.decodeOne(cb)));
                 return l;
+            case HYPERLOGLOG:
+                return DataType.toType(codec.decodeOne(cb));
             default:
                 return null;
         }
@@ -112,6 +115,9 @@ public enum DataType implements OptionCodec.Codecable<DataType>
             case SET:
                 codec.writeOne(DataType.fromType((AbstractType)value), cb);
                 break;
+            case HYPERLOGLOG:
+                codec.writeOne(DataType.fromType((AbstractType)value), cb);
+                break;
             case MAP:
                 List<AbstractType> l = (List<AbstractType>)value;
                 codec.writeOne(DataType.fromType(l.get(0)), cb);
@@ -128,6 +134,8 @@ public enum DataType implements OptionCodec.Codecable<DataType>
                 return 2 + ((String)value).getBytes(StandardCharsets.UTF_8).length;
             case LIST:
             case SET:
+                return codec.oneSerializedSize(DataType.fromType((AbstractType)value));
+            case HYPERLOGLOG:
                 return codec.oneSerializedSize(DataType.fromType((AbstractType)value));
             case MAP:
                 List<AbstractType> l = (List<AbstractType>)value;
@@ -164,6 +172,10 @@ public enum DataType implements OptionCodec.Codecable<DataType>
                     MapType mt = (MapType)type;
                     return Pair.<DataType, Object>create(MAP, Arrays.asList(mt.keys, mt.values));
                 }
+                else if (type instanceof HyperLogLogType)
+                {
+                    return Pair.<DataType, Object>create(HYPERLOGLOG, ((HyperLogLogType)type).elements);
+                }
                 else
                 {
                     assert type instanceof SetType;
@@ -190,6 +202,8 @@ public enum DataType implements OptionCodec.Codecable<DataType>
                     return ListType.getInstance((AbstractType)entry.right);
                 case SET:
                     return SetType.getInstance((AbstractType)entry.right);
+                case HYPERLOGLOG:
+                    return HyperLogLogType.getInstance((AbstractType)entry.right);
                 case MAP:
                     List<AbstractType> l = (List<AbstractType>)entry.right;
                     return MapType.getInstance(l.get(0), l.get(1));
